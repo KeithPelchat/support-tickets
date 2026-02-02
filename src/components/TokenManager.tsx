@@ -6,6 +6,7 @@ interface ClientToken {
   token: string;
   clientId: string;
   clientName: string;
+  clientEmail: string | null;
   createdAt: string;
   requestCount: number;
 }
@@ -20,11 +21,14 @@ export function TokenManager({ tokens, adminPassword, onUpdate }: TokenManagerPr
   const [isCreating, setIsCreating] = useState(false);
   const [newClientId, setNewClientId] = useState('');
   const [newClientName, setNewClientName] = useState('');
+  const [newClientEmail, setNewClientEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [deletingToken, setDeletingToken] = useState<string | null>(null);
+  const [editingEmailToken, setEditingEmailToken] = useState<string | null>(null);
+  const [editEmailValue, setEditEmailValue] = useState('');
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +44,7 @@ export function TokenManager({ tokens, adminPassword, onUpdate }: TokenManagerPr
           adminPassword,
           clientId: newClientId.toLowerCase().trim(),
           clientName: newClientName.trim(),
+          clientEmail: newClientEmail.trim() || null,
         }),
       });
 
@@ -52,6 +57,7 @@ export function TokenManager({ tokens, adminPassword, onUpdate }: TokenManagerPr
       setSuccess(`Token created: ${data.token.token}`);
       setNewClientId('');
       setNewClientName('');
+      setNewClientEmail('');
       setIsCreating(false);
       onUpdate();
     } catch (err) {
@@ -87,6 +93,42 @@ export function TokenManager({ tokens, adminPassword, onUpdate }: TokenManagerPr
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setDeletingToken(null);
+    }
+  };
+
+  const handleEmailEdit = (token: ClientToken) => {
+    setEditingEmailToken(token.token);
+    setEditEmailValue(token.clientEmail || '');
+  };
+
+  const handleEmailSave = async (tokenValue: string) => {
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch('/api/support/tokens', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminPassword,
+          token: tokenValue,
+          clientEmail: editEmailValue.trim() || null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update email');
+      }
+
+      setSuccess('Email updated successfully');
+      setEditingEmailToken(null);
+      onUpdate();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -173,6 +215,19 @@ export function TokenManager({ tokens, adminPassword, onUpdate }: TokenManagerPr
               required
             />
           </div>
+          <div>
+            <label htmlFor="clientEmail" className="block text-sm font-medium text-gray-700">
+              Client Email <span className="text-gray-400">(optional - for notifications)</span>
+            </label>
+            <input
+              type="email"
+              id="clientEmail"
+              value={newClientEmail}
+              onChange={(e) => setNewClientEmail(e.target.value)}
+              placeholder="e.g., contact@acme.com"
+              className="mt-1 block w-full rounded-md border p-2 text-sm"
+            />
+          </div>
           <div className="flex gap-2">
             <button
               type="submit"
@@ -187,6 +242,7 @@ export function TokenManager({ tokens, adminPassword, onUpdate }: TokenManagerPr
                 setIsCreating(false);
                 setNewClientId('');
                 setNewClientName('');
+                setNewClientEmail('');
                 setError(null);
               }}
               className="px-3 py-1 text-sm bg-gray-200 rounded hover:bg-gray-300"
@@ -221,6 +277,52 @@ export function TokenManager({ tokens, adminPassword, onUpdate }: TokenManagerPr
                       </span>
                     )}
                   </div>
+
+                  {/* Email Section */}
+                  <div className="mt-2">
+                    {editingEmailToken === token.token ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="email"
+                          value={editEmailValue}
+                          onChange={(e) => setEditEmailValue(e.target.value)}
+                          placeholder="client@example.com"
+                          className="text-sm border rounded px-2 py-1 w-64"
+                        />
+                        <button
+                          onClick={() => handleEmailSave(token.token)}
+                          disabled={isSubmitting}
+                          className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 disabled:opacity-50"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingEmailToken(null)}
+                          className="text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        {token.clientEmail ? (
+                          <span className="text-sm text-gray-600">{token.clientEmail}</span>
+                        ) : (
+                          <span className="text-sm text-gray-400 italic">No email set</span>
+                        )}
+                        <button
+                          onClick={() => handleEmailEdit(token)}
+                          className="text-xs text-blue-600 hover:text-blue-800"
+                        >
+                          {token.clientEmail ? 'Edit' : 'Add'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="mt-2 flex items-center gap-2">
                     <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono text-gray-700">
                       {token.token}

@@ -1,10 +1,10 @@
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 
 const sesClient = new SESClient({
-  region: process.env.AWS_SES_REGION || 'us-east-1',
+  region: process.env.AWS_REGION || 'us-east-1',
   credentials: {
-    accessKeyId: process.env.AWS_SES_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SES_SECRET_ACCESS_KEY || '',
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
   },
 });
 
@@ -15,11 +15,13 @@ interface SendEmailParams {
 }
 
 export async function sendEmail({ to, subject, body }: SendEmailParams): Promise<boolean> {
-  if (!process.env.AWS_SES_ACCESS_KEY_ID || !process.env.AWS_SES_SECRET_ACCESS_KEY) {
+  if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
     console.log('SES not configured, skipping email send');
     console.log('Would have sent:', { to, subject, body });
     return false;
   }
+
+  const fromEmail = process.env.FROM_EMAIL || process.env.NOTIFICATION_EMAIL || to;
 
   try {
     const command = new SendEmailCommand({
@@ -38,7 +40,7 @@ export async function sendEmail({ to, subject, body }: SendEmailParams): Promise
           Data: subject,
         },
       },
-      Source: to,
+      Source: fromEmail,
     });
 
     await sesClient.send(command);
@@ -80,6 +82,79 @@ ${description}
 
 ---
 View all requests in the admin dashboard.
+    `.trim(),
+  });
+}
+
+export async function sendClientNoteNotification(
+  clientEmail: string,
+  clientName: string,
+  requestType: string,
+  note: string,
+  portalUrl: string
+): Promise<boolean> {
+  if (!clientEmail) {
+    console.log('No client email provided, skipping notification');
+    return false;
+  }
+
+  return sendEmail({
+    to: clientEmail,
+    subject: `Update on Your Support Request - ${requestType}`,
+    body: `
+Hello ${clientName},
+
+We have an update on your support request:
+
+---
+${note}
+---
+
+You can view your full request history at:
+${portalUrl}
+
+Thank you,
+Support Team
+    `.trim(),
+  });
+}
+
+export async function sendClientStatusNotification(
+  clientEmail: string,
+  clientName: string,
+  requestType: string,
+  oldStatus: string,
+  newStatus: string,
+  portalUrl: string
+): Promise<boolean> {
+  if (!clientEmail) {
+    console.log('No client email provided, skipping notification');
+    return false;
+  }
+
+  const statusLabels: Record<string, string> = {
+    new: 'New',
+    in_progress: 'In Progress',
+    resolved: 'Resolved',
+    closed: 'Closed',
+  };
+
+  return sendEmail({
+    to: clientEmail,
+    subject: `Your Support Request Status Changed to ${statusLabels[newStatus] || newStatus}`,
+    body: `
+Hello ${clientName},
+
+The status of your support request (${requestType}) has been updated.
+
+Previous Status: ${statusLabels[oldStatus] || oldStatus}
+New Status: ${statusLabels[newStatus] || newStatus}
+
+You can view your request details at:
+${portalUrl}
+
+Thank you,
+Support Team
     `.trim(),
   });
 }

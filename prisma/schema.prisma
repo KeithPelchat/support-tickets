@@ -17,8 +17,20 @@ model SupportRequest {
   createdAt     DateTime               @default(now()) @map("created_at")
   updatedAt     DateTime               @updatedAt @map("updated_at")
   images        SupportRequestImage[]
+  messages      Message[]
 
   @@map("support_requests")
+}
+
+model Message {
+  id         String         @id @default(cuid())
+  requestId  String         @map("request_id")
+  content    String
+  senderType String         @map("sender_type") // "admin" or "client"
+  createdAt  DateTime       @default(now()) @map("created_at")
+  request    SupportRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
 }
 
 model SupportRequestImage {
@@ -34,10 +46,11 @@ model SupportRequestImage {
 }
 
 model ClientToken {
-  token      String   @id
-  clientId   String   @map("client_id")
-  clientName String   @map("client_name")
-  createdAt  DateTime @default(now()) @map("created_at")
+  token       String   @id
+  clientId    String   @map("client_id")
+  clientName  String   @map("client_name")
+  clientEmail String?  @map("client_email")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   @@map("client_tokens")
 }

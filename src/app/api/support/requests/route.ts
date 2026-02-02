@@ -25,7 +25,12 @@ export async function GET(request: NextRequest) {
       const requests = await prisma.supportRequest.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        include: { images: true },
+        include: {
+          images: true,
+          messages: {
+            orderBy: { createdAt: 'asc' },
+          },
+        },
       });
 
       const clients = await prisma.clientToken.findMany({
@@ -68,6 +73,15 @@ export async function GET(request: NextRequest) {
               size: true,
               uploadedAt: true,
             },
+          },
+          messages: {
+            select: {
+              id: true,
+              content: true,
+              senderType: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'asc' },
           },
         },
       });

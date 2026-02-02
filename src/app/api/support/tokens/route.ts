@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { adminPassword, clientId, clientName } = body;
+    const { adminPassword, clientId, clientName, clientEmail } = body;
 
     if (!adminPassword || !validateAdminPassword(adminPassword)) {
       return NextResponse.json({ error: 'Invalid admin password' }, { status: 401 });
@@ -61,6 +61,14 @@ export async function POST(request: NextRequest) {
     if (!/^[a-z0-9_-]+$/.test(clientId)) {
       return NextResponse.json(
         { error: 'Client ID must be lowercase alphanumeric (with optional underscores/hyphens)' },
+        { status: 400 }
+      );
+    }
+
+    // Validate email format if provided
+    if (clientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) {
+      return NextResponse.json(
+        { error: 'Invalid email format' },
         { status: 400 }
       );
     }
@@ -84,6 +92,7 @@ export async function POST(request: NextRequest) {
         token,
         clientId,
         clientName,
+        clientEmail: clientEmail || null,
       },
     });
 
@@ -93,6 +102,52 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error creating token:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { adminPassword, token, clientEmail } = body;
+
+    if (!adminPassword || !validateAdminPassword(adminPassword)) {
+      return NextResponse.json({ error: 'Invalid admin password' }, { status: 401 });
+    }
+
+    if (!token) {
+      return NextResponse.json({ error: 'Token is required' }, { status: 400 });
+    }
+
+    // Validate email format if provided
+    if (clientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) {
+      return NextResponse.json(
+        { error: 'Invalid email format' },
+        { status: 400 }
+      );
+    }
+
+    const existing = await prisma.clientToken.findUnique({
+      where: { token },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Token not found' }, { status: 404 });
+    }
+
+    const updatedToken = await prisma.clientToken.update({
+      where: { token },
+      data: {
+        clientEmail: clientEmail || null,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      token: updatedToken,
+    });
+  } catch (error) {
+    console.error('Error updating token:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
