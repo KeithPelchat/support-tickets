@@ -3,6 +3,15 @@
 import { useEffect, useState, useCallback } from 'react';
 import { AdminFilters } from '@/components/AdminFilters';
 import { AdminTable } from '@/components/AdminTable';
+import { TokenManager } from '@/components/TokenManager';
+
+interface ImageInfo {
+  id: string;
+  imageUrl: string;
+  filename: string;
+  size: number;
+  uploadedAt: string;
+}
 
 interface SupportRequest {
   id: string;
@@ -13,6 +22,7 @@ interface SupportRequest {
   internalNotes: string | null;
   createdAt: string;
   updatedAt: string;
+  images?: ImageInfo[];
 }
 
 interface Client {
@@ -25,12 +35,25 @@ interface Counts {
   in_progress: number;
 }
 
+interface ClientToken {
+  token: string;
+  clientId: string;
+  clientName: string;
+  createdAt: string;
+  requestCount: number;
+}
+
+type Tab = 'requests' | 'tokens';
+
 export default function AdminDashboard() {
   const [adminPassword, setAdminPassword] = useState<string | null>(null);
   const [passwordInput, setPasswordInput] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
+  const [activeTab, setActiveTab] = useState<Tab>('requests');
+
+  // Requests state
   const [requests, setRequests] = useState<SupportRequest[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [counts, setCounts] = useState<Counts>({ new: 0, in_progress: 0 });
@@ -39,6 +62,10 @@ export default function AdminDashboard() {
   const [selectedClient, setSelectedClient] = useState('');
   const [selectedType, setSelectedType] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
+
+  // Tokens state
+  const [tokens, setTokens] = useState<ClientToken[]>([]);
+  const [isLoadingTokens, setIsLoadingTokens] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem('adminPassword');
@@ -82,11 +109,33 @@ export default function AdminDashboard() {
     }
   }, [adminPassword, selectedClient, selectedType, selectedStatus]);
 
+  const fetchTokens = useCallback(async () => {
+    if (!adminPassword) return;
+
+    setIsLoadingTokens(true);
+    try {
+      const params = new URLSearchParams({ adminPassword });
+      const response = await fetch(`/api/support/tokens?${params.toString()}`);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch tokens');
+      }
+
+      const data = await response.json();
+      setTokens(data.tokens);
+    } catch (error) {
+      console.error('Error fetching tokens:', error);
+    } finally {
+      setIsLoadingTokens(false);
+    }
+  }, [adminPassword]);
+
   useEffect(() => {
     if (isAuthenticated && adminPassword) {
       fetchData();
+      fetchTokens();
     }
-  }, [isAuthenticated, adminPassword, fetchData]);
+  }, [isAuthenticated, adminPassword, fetchData, fetchTokens]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -175,28 +224,71 @@ export default function AdminDashboard() {
           </button>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <AdminFilters
-            clients={clients}
-            selectedClient={selectedClient}
-            selectedType={selectedType}
-            selectedStatus={selectedStatus}
-            onClientChange={setSelectedClient}
-            onTypeChange={setSelectedType}
-            onStatusChange={setSelectedStatus}
-          />
-
-          {isLoading ? (
-            <div className="text-center py-6 text-gray-500">Loading...</div>
-          ) : (
-            <AdminTable
-              requests={requests}
-              clients={clients}
-              adminPassword={adminPassword!}
-              onUpdate={fetchData}
-            />
-          )}
+        {/* Tabs */}
+        <div className="mb-4 border-b border-gray-200">
+          <nav className="-mb-px flex gap-4">
+            <button
+              onClick={() => setActiveTab('requests')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'requests'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Support Requests
+            </button>
+            <button
+              onClick={() => setActiveTab('tokens')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'tokens'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Client Tokens ({tokens.length})
+            </button>
+          </nav>
         </div>
+
+        {/* Tab Content */}
+        {activeTab === 'requests' && (
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <AdminFilters
+              clients={clients}
+              selectedClient={selectedClient}
+              selectedType={selectedType}
+              selectedStatus={selectedStatus}
+              onClientChange={setSelectedClient}
+              onTypeChange={setSelectedType}
+              onStatusChange={setSelectedStatus}
+            />
+
+            {isLoading ? (
+              <div className="text-center py-6 text-gray-500">Loading...</div>
+            ) : (
+              <AdminTable
+                requests={requests}
+                clients={clients}
+                adminPassword={adminPassword!}
+                onUpdate={fetchData}
+              />
+            )}
+          </div>
+        )}
+
+        {activeTab === 'tokens' && (
+          <div className="bg-white rounded-lg shadow-md p-6">
+            {isLoadingTokens ? (
+              <div className="text-center py-6 text-gray-500">Loading...</div>
+            ) : (
+              <TokenManager
+                tokens={tokens}
+                adminPassword={adminPassword!}
+                onUpdate={fetchTokens}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
