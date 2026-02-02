@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
       const requests = await prisma.supportRequest.findMany({
         where,
         orderBy: { createdAt: 'desc' },
+        include: { images: true },
       });
 
       const clients = await prisma.clientToken.findMany({
@@ -59,6 +60,15 @@ export async function GET(request: NextRequest) {
           status: true,
           createdAt: true,
           updatedAt: true,
+          images: {
+            select: {
+              id: true,
+              imageUrl: true,
+              filename: true,
+              size: true,
+              uploadedAt: true,
+            },
+          },
         },
       });
 

@@ -22,10 +22,16 @@ This is a Next.js 14 support ticket system with two interfaces:
 - **Admin Dashboard** (`/support/admin`): Password auth stored in localStorage, validated against `ADMIN_PASSWORD` env var by `lib/auth.ts:validateAdminPassword()`.
 
 ### Data Flow
-- Clients submit requests via POST `/api/support/submit` → creates `SupportRequest` with status "new" → triggers SES email notification
-- Clients view their requests via GET `/api/support/requests?token=xxx` (filtered by clientId)
-- Admins view all requests via GET `/api/support/requests?adminPassword=xxx` (includes counts and client list)
+- Clients submit requests via POST `/api/support/submit` (multipart/form-data) → creates `SupportRequest` with status "new" → uploads images to S3/local → triggers SES email notification
+- Clients view their requests via GET `/api/support/requests?token=xxx` (filtered by clientId, includes images)
+- Admins view all requests via GET `/api/support/requests?adminPassword=xxx` (includes counts, client list, and images)
 - Admins update status/notes via PATCH `/api/support/requests/[id]`
+
+### Image Upload
+- Files uploaded via `lib/s3.ts` - uses S3 if configured, falls back to local `public/uploads/` directory
+- Validation: PNG/JPEG/GIF/WebP only, max 5MB per file, max 5 files per request
+- Client form supports: file picker, drag-and-drop, clipboard paste (Ctrl+V screenshots)
+- Images stored in `support_request_images` table with relation to parent request
 
 ### Key Patterns
 - All pages under `/support` use `"use client"` directive for client-side interactivity
@@ -34,7 +40,8 @@ This is a Next.js 14 support ticket system with two interfaces:
 - Internal notes (`internalNotes` field) are excluded from client API responses
 
 ### Database Models
-- `SupportRequest`: id, clientId, requestType, description, status, internalNotes, timestamps
+- `SupportRequest`: id, clientId, requestType, description, status, internalNotes, timestamps, images[]
+- `SupportRequestImage`: id, requestId (FK), imageUrl, filename, size, uploadedAt
 - `ClientToken`: token (PK), clientId, clientName, createdAt
 
 ### Request Statuses

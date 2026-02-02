@@ -53,13 +53,18 @@ export async function sendEmail({ to, subject, body }: SendEmailParams): Promise
 export async function sendNewRequestNotification(
   clientName: string,
   requestType: string,
-  description: string
+  description: string,
+  imageCount: number = 0
 ): Promise<boolean> {
   const notificationEmail = process.env.NOTIFICATION_EMAIL;
   if (!notificationEmail) {
     console.log('NOTIFICATION_EMAIL not configured');
     return false;
   }
+
+  const imageInfo = imageCount > 0
+    ? `\nAttachments: ${imageCount} image${imageCount > 1 ? 's' : ''} attached - view in admin dashboard\n`
+    : '';
 
   return sendEmail({
     to: notificationEmail,
@@ -69,7 +74,7 @@ A new support request has been submitted.
 
 Client: ${clientName}
 Type: ${requestType}
-
+${imageInfo}
 Description:
 ${description}
 

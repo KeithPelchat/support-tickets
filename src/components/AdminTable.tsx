@@ -1,6 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import { ImageLightbox } from './ImageLightbox';
+
+interface ImageInfo {
+  id: string;
+  imageUrl: string;
+  filename: string;
+  size: number;
+  uploadedAt: string;
+}
 
 interface SupportRequest {
   id: string;
@@ -11,6 +20,7 @@ interface SupportRequest {
   internalNotes: string | null;
   createdAt: string;
   updatedAt: string;
+  images?: ImageInfo[];
 }
 
 interface Client {
@@ -31,6 +41,9 @@ export function AdminTable({ requests, clients, adminPassword, onUpdate }: Admin
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
   const [notesValue, setNotesValue] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [lightboxImages, setLightboxImages] = useState<ImageInfo[] | null>(null);
+  const [lightboxInitialIndex, setLightboxInitialIndex] = useState(0);
 
   const getClientName = (clientId: string) => {
     const client = clients.find((c) => c.clientId === clientId);
@@ -87,6 +100,21 @@ export function AdminTable({ requests, clients, adminPassword, onUpdate }: Admin
     }
   };
 
+  const openLightbox = (images: ImageInfo[], index: number = 0) => {
+    setLightboxImages(images);
+    setLightboxInitialIndex(index);
+  };
+
+  const closeLightbox = () => {
+    setLightboxImages(null);
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   if (requests.length === 0) {
     return (
       <div className="text-center py-6 text-gray-500">
@@ -96,103 +124,178 @@ export function AdminTable({ requests, clients, adminPassword, onUpdate }: Admin
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Client
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Type
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Description
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Status
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Internal Notes
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Date
-            </th>
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-          {requests.map((request) => (
-            <tr key={request.id} className={updatingId === request.id ? 'opacity-50' : ''}>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                {getClientName(request.clientId)}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {request.requestType}
-              </td>
-              <td className="px-6 py-4 text-sm text-gray-500 max-w-xs">
-                <div className="truncate" title={request.description}>
-                  {request.description}
+    <>
+      <div className="space-y-4">
+        {requests.map((request) => (
+          <div
+            key={request.id}
+            className={`border rounded-lg bg-white shadow-sm ${
+              updatingId === request.id ? 'opacity-50' : ''
+            }`}
+          >
+            {/* Header Row */}
+            <div
+              className="p-4 cursor-pointer hover:bg-gray-50"
+              onClick={() => setExpandedId(expandedId === request.id ? null : request.id)}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <span className="font-medium text-gray-900">
+                    {getClientName(request.clientId)}
+                  </span>
+                  <span className="text-sm text-gray-500">{request.requestType}</span>
+                  {request.images && request.images.length > 0 && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      {request.images.length} image{request.images.length > 1 ? 's' : ''}
+                    </span>
+                  )}
                 </div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <select
-                  value={request.status}
-                  onChange={(e) => handleStatusChange(request.id, e.target.value)}
-                  disabled={updatingId === request.id}
-                  className="text-sm border rounded p-1"
-                >
-                  {statuses.map((status) => (
-                    <option key={status} value={status}>
-                      {status === 'new' ? 'New' :
-                       status === 'in_progress' ? 'In Progress' :
-                       status === 'resolved' ? 'Resolved' : 'Closed'}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              <td className="px-6 py-4 text-sm text-gray-500 max-w-xs">
-                {editingNotesId === request.id ? (
-                  <div className="flex flex-col gap-2">
-                    <textarea
-                      value={notesValue}
-                      onChange={(e) => setNotesValue(e.target.value)}
-                      className="text-sm border rounded p-1 w-full"
-                      rows={2}
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleNotesSave(request.id)}
-                        disabled={updatingId === request.id}
-                        className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => setEditingNotesId(null)}
-                        className="text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
-                      >
-                        Cancel
-                      </button>
+                <div className="flex items-center gap-4">
+                  <select
+                    value={request.status}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleStatusChange(request.id, e.target.value);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    disabled={updatingId === request.id}
+                    className="text-sm border rounded p-1"
+                  >
+                    {statuses.map((status) => (
+                      <option key={status} value={status}>
+                        {status === 'new' ? 'New' :
+                         status === 'in_progress' ? 'In Progress' :
+                         status === 'resolved' ? 'Resolved' : 'Closed'}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-sm text-gray-500">
+                    {new Date(request.createdAt).toLocaleDateString()}
+                  </span>
+                  <svg
+                    className={`w-5 h-5 text-gray-400 transition-transform ${
+                      expandedId === request.id ? 'rotate-180' : ''
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Expanded Content */}
+            {expandedId === request.id && (
+              <div className="border-t px-4 py-4 space-y-4">
+                {/* Description */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-1">Description</h4>
+                  <p className="text-gray-600 whitespace-pre-wrap bg-gray-50 p-3 rounded">
+                    {request.description}
+                  </p>
+                </div>
+
+                {/* Images */}
+                {request.images && request.images.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">
+                      Attachments ({request.images.length})
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                      {request.images.map((image, index) => (
+                        <div key={image.id} className="space-y-1">
+                          <button
+                            onClick={() => openLightbox(request.images!, index)}
+                            className="relative aspect-square w-full rounded-lg overflow-hidden border hover:border-blue-500 transition-colors group"
+                          >
+                            <img
+                              src={image.imageUrl}
+                              alt={image.filename}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity flex items-center justify-center">
+                              <svg
+                                className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                              </svg>
+                            </div>
+                          </button>
+                          <div className="text-xs text-gray-500 truncate" title={image.filename}>
+                            {image.filename}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {formatFileSize(image.size)}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ) : (
-                  <div
-                    className="cursor-pointer hover:bg-gray-50 p-1 rounded"
-                    onClick={() => handleNotesEdit(request)}
-                  >
-                    {request.internalNotes || (
-                      <span className="text-gray-400 italic">Click to add notes</span>
-                    )}
-                  </div>
                 )}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {new Date(request.createdAt).toLocaleDateString()}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+
+                {/* Internal Notes */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-1">Internal Notes</h4>
+                  {editingNotesId === request.id ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={notesValue}
+                        onChange={(e) => setNotesValue(e.target.value)}
+                        className="w-full text-sm border rounded p-2"
+                        rows={3}
+                        placeholder="Add internal notes..."
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleNotesSave(request.id)}
+                          disabled={updatingId === request.id}
+                          className="text-sm bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 disabled:opacity-50"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingNotesId(null)}
+                          className="text-sm bg-gray-200 px-3 py-1 rounded hover:bg-gray-300"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className="cursor-pointer hover:bg-gray-50 p-3 rounded border border-dashed border-gray-200"
+                      onClick={() => handleNotesEdit(request)}
+                    >
+                      {request.internalNotes || (
+                        <span className="text-gray-400 italic">Click to add notes...</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Lightbox */}
+      {lightboxImages && (
+        <ImageLightbox
+          images={lightboxImages}
+          initialIndex={lightboxInitialIndex}
+          onClose={closeLightbox}
+          showDownload
+          showMetadata
+        />
+      )}
+    </>
   );
 }

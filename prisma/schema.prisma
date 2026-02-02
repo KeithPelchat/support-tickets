@@ -8,16 +8,29 @@ datasource db {
 }
 
 model SupportRequest {
-  id            String   @id @default(cuid())
-  clientId      String   @map("client_id")
-  requestType   String   @map("request_type")
+  id            String                 @id @default(cuid())
+  clientId      String                 @map("client_id")
+  requestType   String                 @map("request_type")
   description   String
-  status        String   @default("new")
-  internalNotes String?  @map("internal_notes")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  status        String                 @default("new")
+  internalNotes String?                @map("internal_notes")
+  createdAt     DateTime               @default(now()) @map("created_at")
+  updatedAt     DateTime               @updatedAt @map("updated_at")
+  images        SupportRequestImage[]
 
   @@map("support_requests")
+}
+
+model SupportRequestImage {
+  id         String         @id @default(cuid())
+  requestId  String         @map("request_id")
+  imageUrl   String         @map("image_url")
+  filename   String
+  size       Int
+  uploadedAt DateTime       @default(now()) @map("uploaded_at")
+  request    SupportRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("support_request_images")
 }
 
 model ClientToken {
