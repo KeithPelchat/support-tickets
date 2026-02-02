@@ -1,36 +1,151 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Support Ticket System
 
-## Getting Started
+A Next.js 14 support ticket system with client portal and admin dashboard.
 
-First, run the development server:
+## Features
+
+- **Client Portal** (`/support`): Token-based authentication, submit support requests, view request history
+- **Admin Dashboard** (`/support/admin`): Password-protected, manage all requests, update status, add internal notes
+- **Email Notifications**: Amazon SES integration for new request notifications
+- **Iframe Compatible**: Configured headers allow embedding in iframes
+
+## Setup
+
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure Environment
+
+Copy `.env.example` to `.env` and fill in the values:
+
+```bash
+cp .env.example .env
+```
+
+Required environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `AWS_SES_ACCESS_KEY_ID` | AWS access key for SES (optional) |
+| `AWS_SES_SECRET_ACCESS_KEY` | AWS secret key for SES (optional) |
+| `AWS_SES_REGION` | AWS region for SES (default: us-east-1) |
+| `ADMIN_PASSWORD` | Password for admin dashboard access |
+| `NOTIFICATION_EMAIL` | Email address for new request notifications |
+
+### 3. Database Setup
+
+Generate the Prisma client:
+
+```bash
+npx prisma generate
+```
+
+Push the schema to your database:
+
+```bash
+npx prisma db push
+```
+
+Seed the database with client tokens:
+
+```bash
+npx prisma db seed
+```
+
+### 4. Run Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Usage
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Client Portal
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Access the client portal with a valid token:
 
-## Learn More
+```
+http://localhost:3000/support?token=pad_a8f7b9c2d4e1f6
+```
 
-To learn more about Next.js, take a look at the following resources:
+Default seeded tokens:
+- `pad_a8f7b9c2d4e1f6` - Pad
+- `acme_x7y8z9a1b2c3d4` - Acme Corporation
+- `techstart_m3n4o5p6q7r8` - TechStart Inc
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Admin Dashboard
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Access the admin dashboard:
 
-## Deploy on Vercel
+```
+http://localhost:3000/support/admin
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Enter the admin password configured in your environment.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## API Routes
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| POST | `/api/support/submit` | Submit a new support request |
+| GET | `/api/support/requests` | Get requests (token for client, adminPassword for admin) |
+| PATCH | `/api/support/requests/[id]` | Update request status/notes (admin only) |
+
+## Project Structure
+
+```
+support-tickets/
+├── prisma/
+│   ├── schema.prisma          # Database schema
+│   └── seed.ts                # Seed client tokens
+├── src/
+│   ├── app/
+│   │   ├── layout.tsx         # Root layout
+│   │   ├── globals.css        # Tailwind styles
+│   │   ├── support/
+│   │   │   ├── page.tsx       # Client portal
+│   │   │   └── admin/
+│   │   │       └── page.tsx   # Admin dashboard
+│   │   └── api/
+│   │       └── support/
+│   │           ├── submit/route.ts
+│   │           ├── requests/route.ts
+│   │           └── requests/[id]/route.ts
+│   ├── lib/
+│   │   ├── db.ts              # Prisma client singleton
+│   │   ├── ses.ts             # Amazon SES email helper
+│   │   └── auth.ts            # Token/password validation
+│   └── components/
+│       ├── StatusBadge.tsx
+│       ├── RequestForm.tsx
+│       ├── RequestList.tsx
+│       ├── AdminTable.tsx
+│       └── AdminFilters.tsx
+├── next.config.mjs
+├── tailwind.config.ts
+└── package.json
+```
+
+## Request Statuses
+
+- `new` - Newly submitted request
+- `in_progress` - Being worked on
+- `resolved` - Issue resolved
+- `closed` - Request closed
+
+## Deployment
+
+### Production Build
+
+```bash
+npm run build
+npm start
+```
+
+### Environment Variables for Production
+
+Ensure all environment variables are set in your production environment. For AWS SES, the sender email must be verified in SES.

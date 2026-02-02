@@ -1,0 +1,30 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model SupportRequest {
+  id            String   @id @default(cuid())
+  clientId      String   @map("client_id")
+  requestType   String   @map("request_type")
+  description   String
+  status        String   @default("new")
+  internalNotes String?  @map("internal_notes")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("support_requests")
+}
+
+model ClientToken {
+  token      String   @id
+  clientId   String   @map("client_id")
+  clientName String   @map("client_name")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("client_tokens")
+}
